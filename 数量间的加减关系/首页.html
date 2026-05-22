@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黄金矿工—数量间的加减关系</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  background: linear-gradient(180deg, #fff8e1 0%, #ffe0b2 30%, #ffcc80 60%, #ffb74d 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ===== 整体容器 ===== */
+.page-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 40px;
+  padding: 40px 20px;
+  z-index: 2;
+}
+
+/* ===== 标题：一行 ===== */
+.title-area {
+  text-align: center;
+}
+.main-title {
+  font-size: 48px;
+  font-weight: bold;
+  color: #5d4037;
+  text-shadow: 0 3px 12px rgba(0,0,0,0.15);
+}
+
+/* ===== 两个游戏卡片并列 ===== */
+.cards-row {
+  display: flex;
+  gap: 40px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.game-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  width: 320px;
+  min-height: 280px;
+  background: linear-gradient(180deg, #e8d5b0 0%, #c9a87c 100%);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.25), inset 0 0 60px rgba(0,0,0,0.06);
+  padding: 32px 24px;
+  cursor: pointer;
+  text-decoration: none;
+  transition: transform 0.25s, box-shadow 0.25s;
+  border: 3px solid transparent;
+}
+.game-card:hover {
+  transform: translateY(-10px) scale(1.04);
+  box-shadow: 0 16px 48px rgba(0,0,0,0.35);
+  border-color: #ff9800;
+}
+.game-card:active {
+  transform: scale(0.96);
+}
+
+.card-icon {
+  font-size: 64px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-size: 28px;
+  font-weight: bold;
+  color: #3e2723;
+  text-align: center;
+  margin-bottom: 8px;
+}
+.card-desc {
+  font-size: 16px;
+  color: #6d4c41;
+  text-align: center;
+  line-height: 1.6;
+}
+
+/* ===== 右上角矿工 + 钩子 ===== */
+/* 【调整】整个矿工+钩子的位置：改 top 和 right */
+.miner-corner {
+  position: fixed;
+  top: 20px;       /* ← 距顶部 */
+  right: 590px;    /* ← 距右边 */
+  z-index: 1;
+  pointer-events: none;
+  opacity: 0.7;
+}
+.miner-corner .miner-wrap {
+  position: relative;
+  display: inline-block;
+}
+.miner-corner .miner-wrap img.miner-pic {
+  width: 250px; /* ← 矿工大小 */
+  height: auto;
+  filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));
+}
+/* 【调整】钩子位置：相对矿工左下角偏移，改 left / top */
+.miner-corner .hook-pic {
+  position: absolute;
+  width: 100px;    /* ← 钩子大小 */
+  height: auto;
+  left: 73px;      /* ← 钩子水平偏移（相对矿工左上角，正值=右移） */
+  top: 80px;      /* ← 钩子垂直偏移（相对矿工顶部，正值=下移） */
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
+}
+
+/* ===== 底部洒落的物品和福袋（左右对称） ===== */
+.scatter-area {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100vw;
+  height: 55vh;
+  z-index: 1;
+  pointer-events: none;
+}
+.scatter-item {
+  position: absolute;
+  opacity: 0.5;
+  filter: drop-shadow(0 3px 6px rgba(0,0,0,0.15));
+}
+/* 【调整】每个洒落物品的单独位置、大小、旋转 */
+/* 左侧 */
+.s1  { left: 3%;  bottom: 53%; width: 150px;  transform: rotate(-18deg); }
+.s2  { left: 14%; bottom: 85%; width: 120px;  transform: rotate(12deg); }
+.s3  { left: 18%;  bottom: 47%; width: 90px; transform: rotate(8deg); }
+.s4  { left: 38%; bottom: 7%; width: 100px;  transform: rotate(-25deg); }
+.s5  { left: 25%;  bottom: 5%; width: 130px; transform: rotate(5deg); }
+.s6  { left: 7%; bottom: 8%; width: 180px; transform: rotate(0deg); }
+.s7  { left: 7%; bottom: 110%; width: 65px;  transform: rotate(30deg); }
+.s8  { left: 0%; bottom: 0%; width: 5px;  transform: rotate(-8deg); }
+/* 右侧 */
+.s9  { right: 3%;  bottom: 53%; width: 150px;  transform: rotate(15deg); }
+.s10 { right: 14%; bottom: 85%; width: 120px;  transform: rotate(-14deg); }
+.s11 { right: 18%;  bottom: 47%; width: 90px; transform: rotate(-8deg); }
+.s12 { right: 38%; bottom: 7%; width: 100px;  transform: rotate(22deg); }
+.s13 { right: 7%;  bottom: 8%; width: 180px; transform: rotate(6deg); }
+.s14 { right: 25%; bottom: 5%; width: 130px; transform: rotate(-18deg); }
+.s15 { right: 7%; bottom: 110%; width: 65px;  transform: rotate(-32deg); }
+
+/* ===== 响应式 ===== */
+@media (max-width: 750px) {
+  .cards-row { gap: 24px; }
+  .game-card { width: 260px; min-height: 220px; padding: 24px 16px; }
+  .main-title { font-size: 36px; }
+  .card-title { font-size: 22px; }
+  .card-icon { font-size: 48px; }
+  .miner-corner .miner-wrap img.miner-pic { width: 130px; }
+  .miner-corner .hook-pic { width: 55px; left: 40px; top: 100px; }
+  .scatter-item { opacity: 0.35; }
+}
+@media (max-width: 500px) {
+  .cards-row { gap: 16px; flex-direction: column; align-items: center; }
+  .game-card { width: 90vw; max-width: 300px; min-height: 180px; }
+  .main-title { font-size: 28px; }
+  .card-title { font-size: 20px; }
+  .miner-corner { top: 8px; right: 8px; }
+  .miner-corner .miner-wrap img.miner-pic { width: 70px; }
+  .miner-corner .hook-pic { width: 35px; left: 20px; top: 50px; }
+  .scatter-area { height: 35vh; }
+  .scatter-item { opacity: 0.25; }
+}
+</style>
+</head>
+<body>
+
+<!-- 右上角矿工 + 钩子 -->
+<div class="miner-corner">
+  <div class="miner-wrap">
+    <img class="miner-pic" src="素材/矿工.png" alt="矿工">
+    <img class="hook-pic" src="素材/钩子.png" alt="钩子">
+  </div>
+</div>
+
+<!-- 底部洒落的物品和福袋（左右对称） -->
+<div class="scatter-area">
+  <!-- 左侧 -->
+  <img class="scatter-item s1"  src="素材/物品/鱼.png" alt="">
+  <img class="scatter-item s2"  src="素材/物品/草莓.png" alt="">
+  <img class="scatter-item s3"  src="素材/一个福袋.png" alt="">
+  <img class="scatter-item s4"  src="素材/物品/珍珠.png" alt="">
+  <img class="scatter-item s5"  src="素材/两个福袋.png" alt="">
+  <img class="scatter-item s6"  src="素材/物品/书.png" alt="">
+  <img class="scatter-item s7"  src="素材/物品/铅笔.png" alt="">
+  <img class="scatter-item s8"  src="素材/物品/海星.png" alt="">
+  <!-- 右侧 -->
+  <img class="scatter-item s9"  src="素材/物品/章鱼.png" alt="">
+  <img class="scatter-item s10" src="素材/物品/西瓜.png" alt="">
+  <img class="scatter-item s11" src="素材/一个福袋.png" alt="">
+  <img class="scatter-item s12" src="素材/物品/海螺.png" alt="">
+  <img class="scatter-item s13" src="素材/物品/宝箱.png" alt="">
+  <img class="scatter-item s14" src="素材/两个福袋.png" alt="">
+  <img class="scatter-item s15" src="素材/物品/桃.png" alt="">
+</div>
+
+<!-- 主内容 -->
+<div class="page-wrapper">
+
+  <div class="title-area">
+    <div class="main-title">⛏️ 黄金矿工 — 数量间的加减关系</div>
+  </div>
+
+  <div class="cards-row">
+    <a class="game-card" href="部分＋部分＝总数.html">
+      <div class="card-icon">🧮</div>
+      <div class="card-title">部分 ＋ 部分 ＝ 总数</div>
+      <div class="card-desc">两个福袋，一样的物品<br>合起来一共有多少？</div>
+    </a>
+
+    <a class="game-card" href="总数-部分＝另一部分.html">
+      <div class="card-icon">💣</div>
+      <div class="card-title">总数 － 部分 ＝ 另一部分</div>
+      <div class="card-desc">一个福袋，炸弹来了<br>炸了多少？还剩多少？</div>
+    </a>
+  </div>
+
+</div>
+
+</body>
+</html>

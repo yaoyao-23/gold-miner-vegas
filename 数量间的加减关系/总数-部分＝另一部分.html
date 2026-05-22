@@ -1,0 +1,1283 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>总数－部分＝另一部分 - 数量间的加减关系</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  background: linear-gradient(180deg, #fff8e1 0%, #ffe0b2 30%, #ffcc80 60%, #ffb74d 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+  overflow-x: hidden;
+}
+
+/* ===== 返回首页按钮 ===== */
+.back-btn {
+  position: absolute;
+  top: 14px; left: 18px; /* ← 返回按钮位置 */
+  z-index: 30;
+  font-size: 16px;
+  color: #5d4037;
+  text-decoration: none;
+  background: rgba(255,255,255,0.75);
+  padding: 6px 14px;
+  border-radius: 14px;
+  transition: background 0.2s, transform 0.15s;
+}
+.back-btn:hover { background: rgba(255,255,255,0.95); transform: scale(1.06); }
+
+/* ===== 标题（在游戏容器内） ===== */
+/* 【调整】标题位置：用 padding / margin 微调 */
+.title-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 10px 0; /* ← 标题下边距 */
+}
+.title-text {
+  font-size: 36px; /* ← 标题字号 */
+  font-weight: bold;
+  color: #5d4037;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+/* ===== 游戏容器 ===== */
+/* 【调整】容器内边距、最小高度 */
+.game-container {
+  position: relative;
+  width: 124vw;
+  max-width: 1300px;
+  background: linear-gradient(180deg, #e8d5b0 0%, #d4b896 30%, #c9a87c 60%, #b8956a 100%);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 80px rgba(0,0,0,0.08);
+  padding: 20px 24px 24px; /* ← 容器内边距 */
+  margin: 8px auto;
+  min-height: 320px;
+}
+
+/* ===== SVG 绳索层 ===== */
+/* 【调整】绳索颜色、粗细 */
+.rope-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 15;
+}
+#ropeLine {
+  stroke: #6d4c2e; /* ← 绳索颜色 */
+  stroke-width: 5;  /* ← 绳索粗细 */
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+/* ===== 钩子 ===== */
+/* 【调整】钩子大小 */
+.hook-img {
+  position: absolute;
+  z-index: 16;
+  pointer-events: none;
+  width: 150px; /* ← 钩子宽度 */
+  height: auto;
+  transition: none;
+}
+@media (max-width: 600px) {
+  .hook-img { width: 42px; }
+}
+
+/* ===== 浮动福袋（动画中用） ===== */
+/* 【调整】浮动福袋大小、弹开缩放倍数 */
+.floating-bag {
+  position: absolute;
+  z-index: 17;
+  pointer-events: none;
+  width: 110px; /* ← 浮动福袋宽度 */
+  height: auto;
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.floating-bag.pop {
+  transform: scale(1.8); /* ← 弹开放大倍数 */
+  opacity: 0;
+}
+
+/* ===== 顶部区域：左（框+炸弹+框） 右（矿工） ===== */
+/* 【调整】顶部区间距、最小高度 */
+.top-area {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between; /* ← 左组和矿工分居两端 */
+  position: relative;
+  z-index: 5;
+  margin-bottom: -10px; /* ← 顶部区与福袋区间距 */
+  min-height: 220px; /* ← 顶部区最小高度 */
+  padding: 0 10px;
+}
+
+/* 框+炸弹组的容器 */
+/* 【调整】框组整体位置：用 margin-left 左右移动 */
+.boxes-group {
+  display: flex;
+  align-items: flex-end;
+  gap: 18px; /* ← 框1与炸弹、炸弹与框2的间距 */
+  margin-left: 70px; /* ← 框组整体水平偏移（正值=右移） */
+}
+
+/* 信息框（原来 / 还剩/炸了） */
+/* 【调整】框大小、内边距 */
+.info-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; /* ← 框内图与文字间距 */
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  min-width: 150px; /* ← 框最小宽度 */
+  padding: 10px 16px; /* ← 框内边距 */
+  background: rgba(255,255,255,0.7);
+  border-radius: 16px;
+  border: 3px dashed #bcaaa4;
+}
+.info-box.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.info-box-img {
+  width: 120px;  /* ← 物品图宽度 */
+  height: 120px; /* ← 物品图高度 */
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+.info-box-text {
+  font-size: 26px; /* ← 框内文字大小 */
+  font-weight: bold;
+  color: #3e2723;
+  background: rgba(255,255,255,0.9);
+  border-radius: 12px;
+  padding: 6px 18px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* 炸弹（两个框之间） */
+/* 【调整】炸弹大小、位置 */
+.bomb-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 10;
+  opacity: 0;
+  transform: scale(0.4);
+  transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+}
+.bomb-wrapper.show {
+  opacity: 1;
+  transform: scale(1);
+}
+.bomb-img {
+  width: 90px; /* ← 炸弹宽度 */
+  height: auto;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.3));
+}
+
+/* 炸弹爆炸动画 */
+.bomb-wrapper.explode .bomb-img {
+  animation: bombShake 0.15s ease-out,
+             bombFlash 0.3s ease-out 0.15s,
+             bombSettle 0.5s ease-out 0.45s;
+}
+@keyframes bombShake {
+  0%, 100% { transform: translateX(0) scale(1); }
+  25% { transform: translateX(-6px) scale(1.1); }
+  50% { transform: translateX(6px) scale(1.2); }
+  75% { transform: translateX(-4px) scale(1.15); }
+}
+@keyframes bombFlash {
+  0% { filter: brightness(1) drop-shadow(0 4px 8px rgba(0,0,0,0.3)); }
+  50% { filter: brightness(3) drop-shadow(0 0 30px rgba(255,100,0,0.9)); }
+  100% { filter: brightness(1.3) drop-shadow(0 0 15px rgba(255,80,0,0.5)); }
+}
+@keyframes bombSettle {
+  0% { transform: scale(1.3); }
+  100% { transform: scale(1); }
+}
+
+/* 炸弹爆炸闪光覆盖层 */
+.explosion-flash {
+  position: absolute;
+  top: 50%; left: 50%;
+  width: 0; height: 0;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,200,50,0.9) 0%, rgba(255,100,0,0.5) 50%, transparent 70%);
+  pointer-events: none;
+  z-index: 25;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
+  transition: all 0.5s ease-out;
+}
+.explosion-flash.fire {
+  opacity: 1;
+  transform: translate(-50%, -50%) scale(4);
+  width: 140px; height: 140px;
+  animation: flashFade 0.6s ease-out forwards;
+}
+@keyframes flashFade {
+  0% { opacity: 1; transform: translate(-50%, -50%) scale(5); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.2); }
+}
+
+/* 矿工 */
+/* 【调整】矿工图大小、位置（已用 space-between 靠右，margin-right 可微调） */
+.miner-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-right: 100px; /* ← 矿工向右微调（正值=更靠左） */
+  margin-bottom: 0; /* ← 矿工垂直微调（正值=下移） */
+}
+.miner-img {
+  width: 350px; /* ← 矿工宽度 */
+  height: auto;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
+}
+/* 【调整】仪器指示点大小、颜色、位置 */
+.instrument-dot {
+  position: absolute;
+  width: 16px;  /* ← 指示点大小 */
+  height: 16px;
+  background: #ff5722; /* ← 指示点颜色 */
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 8px rgba(255,87,34,0.6);
+  z-index: 18;
+  pointer-events: none;
+}
+
+/* ===== 福袋网格 ===== */
+/* 【调整】福袋大小、间距 */
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  row-gap: 0px;       /* ← 福袋行间距（越小越紧，不能为负） */
+  column-gap: 6px;    /* ← 福袋列间距 */
+  justify-items: center;
+  position: relative;
+  z-index: 5;
+  padding: 0 10px;
+}
+.bag-item {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  transition: transform 0.2s, opacity 0.3s;
+  position: relative;
+}
+.bag-item:hover:not(.mined) {
+  transform: translateY(-8px) scale(1.08);
+}
+.bag-item:active:not(.mined) {
+  transform: scale(0.94);
+}
+.bag-item.mined {
+  cursor: default;
+  opacity: 0.4;
+  transform: none;
+}
+.bag-img {
+  width: 180px; /* ← 福袋宽度 */
+  height: auto;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.2));
+}
+.bag-number {
+  font-size: 18px;
+  font-weight: bold;
+  color: #795548;
+}
+.bag-item.mined .bag-number::after {
+  content: ' ✓';
+  color: #4caf50;
+}
+
+/* ===== 底部区域 ===== */
+/* 【调整】底部区间距 */
+.bottom-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  margin-top: -20px;
+  position: relative;
+  z-index: 5;
+  min-height: 110px;
+}
+
+/* 提示文字 */
+/* 【调整】提示文字位置：改 margin-top（正值=下移） */
+.hint-text {
+  font-size: 20px;
+  color: #6d4c41;
+  text-align: center;
+  margin-top: 18px;  /* ← 提示文字向下移动 */
+  transition: opacity 0.3s;
+}
+
+/* 问题 + 按钮 同行容器 */
+/* 【调整】问题与按钮间距：改 gap */
+.question-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;
+}
+
+/* 问题 */
+/* 【调整】问题文字大小：改 font-size */
+.question-text {
+  font-size: 30px;
+  font-weight: bold;
+  color: #bf360c;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.question-text.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 按钮行 */
+.btn-row {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;
+  padding: 6px 0;
+}
+.btn {
+  border: none;
+  border-radius: 22px;
+  padding: 12px 32px;
+  font-size: 22px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.3s;
+  font-family: inherit;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+.btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.btn:hover { transform: scale(1.06); }
+.btn:active { transform: scale(0.95); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* 【调整】显示算式按钮 */
+.btn-reveal {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(255,152,0,0.4);
+  font-size: 24px;
+  padding: 14px 40px;
+}
+.btn-reveal:hover { box-shadow: 0 6px 22px rgba(255,152,0,0.55); }
+
+.btn-reset {
+  background: #fff;
+  color: #5d4037;
+  border: 2px solid #bcaaa4;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+/* ===== 算式区（在问题同行内） ===== */
+/* 【调整】算式与按钮的间距：改 margin-left */
+.formula-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;       /* ← 算式各部分间距 */
+  flex-wrap: wrap;
+  margin-left: 8px; /* ← 算式与左侧按钮的距离 */
+}
+.formula-part {
+  font-size: 36px; /* ← 算式字号 */
+  font-weight: bold;
+  color: #3e2723;
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.formula-part.show {
+  opacity: 1;
+  transform: scale(1);
+}
+.formula-part.highlight {
+  color: #e65100;
+  text-shadow: 0 2px 10px rgba(230,81,0,0.4);
+  animation: glowPulse 0.6s ease-out;
+}
+@keyframes glowPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* ===== 粒子特效 ===== */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 30;
+  font-size: 24px;
+  animation: particleFly 0.8s ease-out forwards;
+}
+@keyframes particleFly {
+  0% { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 900px) {
+  .title-text { font-size: 28px; }
+  .game-container { padding: 14px 12px 18px; min-height: 620px; }
+  .top-area { gap: 14px; min-height: 170px; }
+  .miner-img { width: 130px; }
+  .info-box { min-width: 100px; padding: 8px 10px; }
+  .info-box-img { width: 80px; height: 80px; }
+  .info-box-text { font-size: 20px; padding: 4px 12px; }
+  .bomb-img { width: 60px; }
+  .bag-grid { gap: 16px 10px; }
+  .bag-img { width: 80px; }
+  .question-text { font-size: 26px; }
+  .formula-part { font-size: 30px; }
+  .btn { font-size: 20px; padding: 10px 26px; }
+  .btn-reveal { font-size: 22px; padding: 12px 32px; }
+  .hook-img { width: 48px; }
+  .floating-bag { width: 80px; }
+}
+
+@media (max-width: 600px) {
+  .title-text { font-size: 24px; }
+  .game-container { padding: 10px 8px 14px; border-radius: 16px; min-height: 540px; }
+  .top-area { gap: 8px; min-height: 140px; }
+  .miner-img { width: 90px; }
+  .info-box { min-width: 65px; padding: 5px 6px; }
+  .info-box-img { width: 50px; height: 50px; }
+  .info-box-text { font-size: 15px; padding: 2px 8px; border-radius: 8px; }
+  .bomb-img { width: 40px; }
+  .bag-grid { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
+  .bag-img { width: 56px; }
+  .bag-number { font-size: 14px; }
+  .question-text { font-size: 22px; }
+  .formula-part { font-size: 24px; }
+  .btn { font-size: 17px; padding: 8px 18px; border-radius: 16px; }
+  .btn-reveal { font-size: 19px; padding: 10px 24px; }
+  .hook-img { width: 36px; }
+  .hint-text { font-size: 16px; }
+  .floating-bag { width: 60px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 游戏区 -->
+<div class="game-container" id="gameContainer">
+
+  <!-- 返回首页 -->
+  <a class="back-btn" href="首页.html">← 返回首页</a>
+
+  <!-- 标题 -->
+  <div class="title-bar">
+    <div class="title-text">💣 总数－部分＝另一部分</div>
+  </div>
+
+  <!-- SVG 绳索 -->
+  <svg class="rope-svg" id="ropeSvg">
+    <line id="ropeLine" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
+  </svg>
+
+  <!-- 钩子 -->
+  <img class="hook-img" id="hookImg" src="素材/钩子.png" alt="钩子" style="visibility:hidden;">
+
+  <!-- 爆炸闪光层 -->
+  <div class="explosion-flash" id="explosionFlash"></div>
+
+  <!-- 顶部：左（框+炸弹+框） 右（矿工） -->
+  <div class="top-area" id="topArea">
+    <!-- 左组：框1 + 炸弹 + 框2 -->
+    <div class="boxes-group">
+      <div class="info-box" id="boxTotal">
+        <img class="info-box-img" id="boxTotalImg" src="" alt="">
+        <span class="info-box-text" id="boxTotalText"></span>
+      </div>
+      <div class="bomb-wrapper" id="bombWrapper">
+        <img class="bomb-img" src="素材/炸弹.png" alt="炸弹">
+      </div>
+      <div class="info-box" id="boxResult">
+        <img class="info-box-img" id="boxResultImg" src="" alt="">
+        <span class="info-box-text" id="boxResultText"></span>
+      </div>
+    </div>
+    <!-- 矿工（右） -->
+    <div class="miner-wrapper" id="minerWrapper">
+      <img class="miner-img" id="minerImg" src="素材/矿工.png" alt="矿工">
+      <div class="instrument-dot" id="instrumentDot"></div>
+    </div>
+  </div>
+
+  <!-- 福袋网格 -->
+  <div class="bag-grid" id="bagGrid">
+  </div>
+
+  <!-- 底部区域 -->
+  <div class="bottom-area" id="bottomArea">
+    <div class="hint-text" id="hintText">👆 点击一个福袋开始挖宝吧！</div>
+    <div class="question-row">
+      <div class="question-text" id="questionText"></div>
+      <button class="btn btn-reveal" id="btnReveal" onclick="revealFormula()">🔍 显示算式</button>
+      <div class="formula-area" id="formulaArea">
+        <span class="formula-part" id="fp1"></span>
+        <span class="formula-part" id="fpMinus">−</span>
+        <span class="formula-part" id="fp2"></span>
+        <span class="formula-part" id="fpEqual">=</span>
+        <span class="formula-part" id="fpTotal"></span>
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-reset" id="btnReset" onclick="resetGame()">🔄 再来一次</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  总数－部分＝另一部分 - 精细调整指南                        ║
+// ╠══════════════════════════════════════════════════════════════╣
+// ║  搜 "【调整】" 快速定位所有可调参数                          ║
+// ║                                                            ║
+// ║  ▸ 素材大小（CSS）：                                       ║
+// ║    矿工     → .miner-img       width                       ║
+// ║    钩子     → .hook-img        width                       ║
+// ║    福袋     → .bag-img         width                       ║
+// ║    炸弹     → .bomb-img        width                       ║
+// ║    框内图   → .info-box-img    width/height                ║
+// ║    浮袋     → .floating-bag    width                       ║
+// ║    福袋间距 → .bag-grid        gap                         ║
+// ║    标题字号 → .title-text      font-size                   ║
+// ║    问题字号 → .question-text   font-size                   ║
+// ║    算式字号 → .formula-part    font-size                   ║
+// ║    按钮大小 → .btn-reveal      font-size / padding         ║
+// ║                                                            ║
+// ║  ▸ 位置调整（CSS）：                                       ║
+// ║    标题     → .title-bar        padding                    ║
+// ║    提示文字 → .hint-text        margin-top                 ║
+// ║    问题按钮 → .question-row     gap / margin               ║
+// ║    算式     → .formula-area     margin-top                 ║
+// ║    重置按钮 → .btn-row          margin                     ║
+// ║    顶部区   → .top-area         gap / min-height           ║
+// ║    底部区   → .bottom-area      gap / margin-top           ║
+// ║                                                            ║
+// ║  ▸ 钩子/绳索/动画（JS）：                                  ║
+// ║    仪器锚点 → getInstrumentAnchor 内 xBias / yBias        ║
+// ║    指示红点 → updateInstrumentDot 内 leftBias / topBias   ║
+// ║    钩子初始 → hookOffsetY / ropeInitLen                   ║
+// ║    钩子中心 → setHookPos 内 hookCenterOffsetX/Y           ║
+// ║    绳索连钩 → updateRope 内 ropeConnectY                  ║
+// ║    下降时长 → DOWN_DURATION                               ║
+// ║    上升时长 → UP_DURATION                                 ║
+// ║    福袋终点 → BAG_END_OFFSET_Y                            ║
+// ║    福袋上方 → bagAboveHook                                ║
+// ║    炸弹延迟 → BOMB_DELAY / 爆炸参数                       ║
+// ║    物品/量词 → ITEMS 数组                                 ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ============================================================
+// 物品库
+// 【调整】增删改物品、修改量词都在这里
+// ============================================================
+const ITEMS = [
+  { file: '素材/物品/鱼.png', name: '鱼', unit: '条' },
+  { file: '素材/物品/书.png', name: '书', unit: '本' },
+  { file: '素材/物品/草莓.png', name: '草莓', unit: '颗' },
+  { file: '素材/物品/铅笔.png', name: '铅笔', unit: '支' },
+  { file: '素材/物品/小车.png', name: '小车', unit: '辆' },
+  { file: '素材/物品/章鱼.png', name: '章鱼', unit: '只' },
+  { file: '素材/物品/海星.png', name: '海星', unit: '个' },
+  { file: '素材/物品/海螺.png', name: '海螺', unit: '个' },
+  { file: '素材/物品/宝箱.png', name: '宝箱', unit: '个' },
+  { file: '素材/物品/桃.png', name: '桃', unit: '个' },
+  { file: '素材/物品/西瓜.png', name: '西瓜', unit: '个' },
+  { file: '素材/物品/瓶子.png', name: '瓶子', unit: '个' },
+  { file: '素材/物品/书包.png', name: '书包', unit: '个' },
+  { file: '素材/物品/水壶.png', name: '水壶', unit: '个' },
+  { file: '素材/物品/杯子.png', name: '杯子', unit: '个' },
+  { file: '素材/物品/珍珠.png', name: '珍珠', unit: '颗' },
+  { file: '素材/物品/纸船.png', name: '纸船', unit: '只' },
+  { file: '素材/物品/抽纸.png', name: '抽纸', unit: '包' },
+  { file: '素材/物品/相机.png', name: '相机', unit: '台' },
+  { file: '素材/物品/可乐.png', name: '可乐', unit: '瓶' },
+  { file: '素材/物品/橡皮.png', name: '橡皮', unit: '块' },
+  { file: '素材/物品/树叶.png', name: '树叶', unit: '片' },
+  { file: '素材/物品/树枝.png', name: '树枝', unit: '根' },
+  { file: '素材/物品/本子.png', name: '本子', unit: '本' },
+];
+
+// ============================================================
+// DOM 引用
+// ============================================================
+const gameContainer = document.getElementById('gameContainer');
+const hookImg = document.getElementById('hookImg');
+const ropeLine = document.getElementById('ropeLine');
+const bagGrid = document.getElementById('bagGrid');
+const minerWrapper = document.getElementById('minerWrapper');
+const minerImg = document.getElementById('minerImg');
+const instrumentDot = document.getElementById('instrumentDot');
+const bombWrapper = document.getElementById('bombWrapper');
+const explosionFlash = document.getElementById('explosionFlash');
+const boxTotal = document.getElementById('boxTotal');
+const boxResult = document.getElementById('boxResult');
+const boxTotalImg = document.getElementById('boxTotalImg');
+const boxResultImg = document.getElementById('boxResultImg');
+const boxTotalText = document.getElementById('boxTotalText');
+const boxResultText = document.getElementById('boxResultText');
+const questionText = document.getElementById('questionText');
+const hintText = document.getElementById('hintText');
+const btnReveal = document.getElementById('btnReveal');
+const btnReset = document.getElementById('btnReset');
+const fp1 = document.getElementById('fp1');
+const fpMinus = document.getElementById('fpMinus');
+const fp2 = document.getElementById('fp2');
+const fpEqual = document.getElementById('fpEqual');
+const fpTotal = document.getElementById('fpTotal');
+
+// ============================================================
+// 状态
+// ============================================================
+let problems = [];             // 10道题目
+let currentBagIndex = -1;
+let isAnimating = false;
+let currentFormulaShown = false;
+
+// ============================================================
+// Web Audio 音效
+// ============================================================
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, dur, type = 'sine', vol = 0.2) {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+function playHookDown() {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.55);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.55);
+  } catch(e) {}
+}
+
+function playHookUp() {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.6);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.65);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.65);
+  } catch(e) {}
+}
+
+function playGrab() {
+  playTone(200, 0.1, 'square', 0.1);
+  setTimeout(() => playTone(250, 0.1, 'square', 0.1), 80);
+}
+
+// 炸弹爆炸音效
+function playExplosion() {
+  try {
+    const ctx = getCtx();
+    // 低频轰鸣
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.type = 'sawtooth';
+    osc1.frequency.setValueAtTime(150, ctx.currentTime);
+    osc1.frequency.linearRampToValueAtTime(60, ctx.currentTime + 0.4);
+    gain1.gain.setValueAtTime(0.35, ctx.currentTime);
+    gain1.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+    osc1.connect(gain1); gain1.connect(ctx.destination);
+    osc1.start(); osc1.stop(ctx.currentTime + 0.5);
+
+    // 噪声爆破
+    const bufferSize = ctx.sampleRate * 0.3;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * Math.exp(-i / (ctx.sampleRate * 0.05));
+    }
+    const noise = ctx.createBufferSource();
+    const noiseGain = ctx.createGain();
+    noise.buffer = buffer;
+    noiseGain.gain.setValueAtTime(0.2, ctx.currentTime);
+    noiseGain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+    noise.connect(noiseGain); noiseGain.connect(ctx.destination);
+    noise.start();
+  } catch(e) {}
+}
+
+function playTreasure() {
+  try {
+    const ctx = getCtx();
+    [523, 659, 784, 1047].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.3);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.3);
+    });
+  } catch(e) {}
+}
+
+function playRevealTick() {
+  playTone(880, 0.12, 'sine', 0.15);
+}
+
+function playRevealFinal() {
+  playTone(1047, 0.35, 'triangle', 0.3);
+}
+
+// ============================================================
+// 仪器锚点
+// 【调整】修改 xBias / yBias 微调仪器连接点
+// ============================================================
+function getInstrumentAnchor() {
+  const minerRect = minerWrapper.getBoundingClientRect();
+  const containerRect = gameContainer.getBoundingClientRect();
+  const xBias = 0;   // ← 水平偏移
+  const yBias = -71;  // ← 垂直偏移
+  const x = minerRect.left + minerRect.width * 0.5 - containerRect.left + xBias;
+  const y = minerRect.bottom - containerRect.top + yBias;
+  return { x, y };
+}
+
+// 【调整】红点位置
+function updateInstrumentDot() {
+  const dotSize = 8;
+  const leftBias = 0;
+  const topBias = -82;
+  instrumentDot.style.left = (minerWrapper.offsetWidth / 2 - dotSize + leftBias) + 'px';
+  instrumentDot.style.top = (minerWrapper.offsetHeight + topBias) + 'px';
+}
+
+// ============================================================
+// 生成10道减法题（总数 ≤ 100）
+// 每个福袋随机分配物品 + 随机类型A或B
+//   类型A：框2显示"还剩" → 问"炸了多少"
+//   类型B：框2显示"炸了" → 问"还剩多少"
+// ============================================================
+function generateProblems() {
+  const list = [];
+  const shuffled = [...ITEMS].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < 10; i++) {
+    const total = Math.floor(Math.random() * 99) + 2;        // 2 ~ 100
+    const destroyed = Math.floor(Math.random() * (total - 1)) + 1; // ≥1
+    const remaining = total - destroyed;
+    const item = shuffled[i % shuffled.length];
+    // 随机类型
+    const showRemaining = Math.random() < 0.5; // true=类型A, false=类型B
+    list.push({
+      item, total, destroyed, remaining,
+      showRemaining, // 框2显示"还剩"还是"炸了"
+      mined: false
+    });
+  }
+  return list;
+}
+
+// ============================================================
+// 渲染福袋网格（一个福袋）
+// ============================================================
+function renderBags() {
+  bagGrid.innerHTML = '';
+  problems.forEach((prob, i) => {
+    const div = document.createElement('div');
+    div.className = 'bag-item';
+    div.innerHTML = `
+      <img class="bag-img" src="素材/一个福袋.png" alt="福袋">
+      <span class="bag-number">${i + 1}</span>
+    `;
+    div.addEventListener('click', () => onBagClick(i, div));
+    bagGrid.appendChild(div);
+  });
+}
+
+// ============================================================
+// 重置显示
+// ============================================================
+function resetDisplay() {
+  boxTotal.classList.remove('show');
+  boxResult.classList.remove('show');
+  bombWrapper.classList.remove('show', 'explode');
+  questionText.classList.remove('show');
+  questionText.textContent = '';
+  hintText.textContent = '👆 点击一个福袋开始挖宝吧！';
+  hintText.style.opacity = '1';
+  btnReveal.classList.remove('show');
+  btnReset.classList.remove('show');
+  hideFormula();
+  hookImg.style.visibility = 'hidden';
+  ropeLine.setAttribute('visibility', 'hidden');
+  currentFormulaShown = false;
+
+  document.querySelectorAll('.bag-item').forEach(el => el.classList.remove('mined'));
+}
+
+function hideFormula() {
+  [fp1, fpMinus, fp2, fpEqual, fpTotal].forEach(el => {
+    el.classList.remove('show', 'highlight');
+    el.textContent = '';
+  });
+  fpMinus.textContent = '−';
+  fpEqual.textContent = '=';
+}
+
+// ============================================================
+// 初始化
+// ============================================================
+function initGame() {
+  problems = generateProblems();
+  currentBagIndex = -1;
+  isAnimating = false;
+  currentFormulaShown = false;
+
+  resetDisplay();
+  renderBags();
+
+  function positionInitialHook() {
+    updateInstrumentDot();
+    const anchor = getInstrumentAnchor();
+    const hw = hookImg.offsetWidth / 2 || 22;
+    const hh = hookImg.offsetHeight / 2 || 22;
+    hookImg.style.left = (anchor.x - hw) + 'px';
+    const hookOffsetY = 20;  // ← 钩子挂在仪器下方的距离
+    const ropeInitLen = 14;  // ← 初始绳索长度
+    hookImg.style.top = (anchor.y - hh + hookOffsetY) + 'px';
+    hookImg.style.visibility = 'visible';
+    ropeLine.setAttribute('x1', anchor.x);
+    ropeLine.setAttribute('y1', anchor.y);
+    ropeLine.setAttribute('x2', anchor.x);
+    ropeLine.setAttribute('y2', anchor.y + ropeInitLen);
+    ropeLine.setAttribute('visibility', 'visible');
+  }
+
+  if (minerImg.complete && minerImg.naturalWidth > 0) {
+    positionInitialHook();
+  } else {
+    minerImg.addEventListener('load', positionInitialHook, { once: true });
+    setTimeout(() => {
+      if (hookImg.style.visibility === 'hidden') positionInitialHook();
+    }, 300);
+  }
+}
+
+function resetGame() {
+  if (isAnimating) return;
+  const allMined = problems.every(p => p.mined);
+  if (!allMined) return;
+  initGame();
+}
+
+// ============================================================
+// 辅助
+// ============================================================
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// ============================================================
+// 绳索 + 钩子位置
+// ============================================================
+function updateRope(hookX, hookY) {
+  const anchor = getInstrumentAnchor();
+  const hookHalfH = hookImg.offsetHeight / 2 || 75;
+  const ropeConnectY = -hookHalfH + 50; // ← 绳索连到钩子顶部（+8微调）
+  ropeLine.setAttribute('x1', anchor.x);
+  ropeLine.setAttribute('y1', anchor.y);
+  ropeLine.setAttribute('x2', hookX);
+  ropeLine.setAttribute('y2', hookY + ropeConnectY);
+}
+
+function setHookPos(x, y) {
+  const hw = hookImg.offsetWidth / 2;
+  const hh = hookImg.offsetHeight / 2;
+  hookImg.style.left = (x - hw) + 'px';
+  hookImg.style.top = (y - hh) + 'px';
+  updateRope(x, y);
+}
+
+// ============================================================
+// 粒子特效
+// ============================================================
+function spawnParticles(x, y, count = 8) {
+  const emojis = ['⭐', '✨', '💎', '🌟', '💰'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * 80;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist - 30 + 'px');
+    gameContainer.appendChild(p);
+    p.addEventListener('animationend', () => p.remove());
+  }
+}
+
+// 爆炸粒子（橙红烟雾风格）
+function spawnExplosionParticles(x, y, count = 16) {
+  const emojis = ['💥', '🔥', '💣', '⚡', '💢', '❗', '♦', '🧨'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    p.style.fontSize = (20 + Math.random() * 24) + 'px';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 60 + Math.random() * 120;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist + 'px');
+    gameContainer.appendChild(p);
+    p.addEventListener('animationend', () => p.remove());
+  }
+}
+
+// ============================================================
+// 炸弹爆炸动画
+// 【调整】炸弹出现在两框之间后的爆炸延迟
+// ============================================================
+async function animateBombExplosion() {
+  const BOMB_DELAY = 300; // ← 炸弹出现后等待多久爆炸（毫秒）
+
+  // 炸弹出现
+  bombWrapper.classList.add('show');
+  await sleep(BOMB_DELAY);
+
+  // 获取炸弹在 gameContainer 中的坐标
+  const bombRect = bombWrapper.getBoundingClientRect();
+  const containerRect = gameContainer.getBoundingClientRect();
+  const bombX = bombRect.left + bombRect.width / 2 - containerRect.left;
+  const bombY = bombRect.top + bombRect.height / 2 - containerRect.top;
+
+  // 闪光
+  explosionFlash.style.left = bombX + 'px';
+  explosionFlash.style.top = bombY + 'px';
+  explosionFlash.classList.add('fire');
+  setTimeout(() => explosionFlash.classList.remove('fire'), 600);
+
+  // 炸弹抖动 + 闪光
+  bombWrapper.classList.add('explode');
+  setTimeout(() => bombWrapper.classList.remove('explode'), 800);
+
+  // 爆炸粒子
+  spawnExplosionParticles(bombX, bombY, 16);
+
+  // 爆炸音效
+  playExplosion();
+
+  // 等待爆炸完成
+  await sleep(600);
+
+  // 显示两个框
+  boxTotal.classList.add('show');
+  boxResult.classList.add('show');
+}
+
+// ============================================================
+// 核心动画：挖宝
+// ============================================================
+async function onBagClick(index, bagEl) {
+  if (isAnimating) return;
+  if (problems[index].mined) return;
+
+  isAnimating = true;
+  currentBagIndex = index;
+  currentFormulaShown = false;
+  const prob = problems[index];
+
+  // 隐藏上一题
+  boxTotal.classList.remove('show');
+  boxResult.classList.remove('show');
+  bombWrapper.classList.remove('show', 'explode');
+  questionText.classList.remove('show');
+  btnReveal.classList.remove('show');
+  hideFormula();
+
+  // 获取福袋中心
+  const bagRect = bagEl.getBoundingClientRect();
+  const containerRect = gameContainer.getBoundingClientRect();
+  const bagCenterX = bagRect.left + bagRect.width / 2 - containerRect.left;
+  const bagCenterY = bagRect.top + bagRect.height / 2 - containerRect.top;
+
+  const anchor = getInstrumentAnchor();
+
+  // 阶段1：钩子下降
+  const DOWN_DURATION = 550;
+  playHookDown();
+  await animateHookTo(anchor.x, anchor.y, bagCenterX, bagCenterY, DOWN_DURATION);
+
+  // 阶段2：抓住
+  const SHAKE_DURATION = 200;
+  playGrab();
+  await shakeHook(bagCenterX, bagCenterY, SHAKE_DURATION);
+
+  // 阶段3：钩子 + 福袋上升
+  const UP_DURATION = 650;
+  const BAG_END_OFFSET_Y = -40;
+  playHookUp();
+
+  const floatBagHalfW = 55;
+  const floatBagHalfH = 40;
+  const floatBag = document.createElement('img');
+  floatBag.className = 'floating-bag';
+  floatBag.src = '素材/一个福袋.png';
+  floatBag.style.left = (bagCenterX - floatBagHalfW) + 'px';
+  floatBag.style.top = (bagCenterY - floatBagHalfH) + 'px';
+  gameContainer.appendChild(floatBag);
+
+  bagEl.classList.add('mined');
+
+  const endX = anchor.x;
+  const endY = anchor.y + BAG_END_OFFSET_Y;
+  await animateHookAndBagUp(bagCenterX, bagCenterY, endX, endY, floatBag, UP_DURATION);
+
+  // 阶段4：福袋弹开
+  const POP_DELAY = 400;
+  floatBag.classList.add('pop');
+  const popX = anchor.x;
+  const popY = anchor.y - 60;
+  spawnParticles(popX, popY, 10);
+  playTreasure();
+  await sleep(POP_DELAY);
+  floatBag.remove();
+
+  // 阶段5：炸弹爆炸 → 显示两框和问题
+  await animateBombExplosion();
+  showBoxesAndQuestion(prob);
+
+  // 钩子归位
+  setHookPos(anchor.x, anchor.y);
+
+  problems[index].mined = true;
+  isAnimating = false;
+  checkAllMined();
+}
+
+// ---- 钩子移动到目标 ----
+function animateHookTo(fromX, fromY, toX, toY, duration) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    function frame(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = easeInOutCubic(t);
+      setHookPos(fromX + (toX - fromX) * eased, fromY + (toY - fromY) * eased);
+      if (t < 1) requestAnimationFrame(frame); else resolve();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// ---- 钩子晃动 ----
+function shakeHook(cx, cy, duration) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    function frame(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      const shake = Math.sin(t * Math.PI * 8) * (1 - t) * 8;
+      setHookPos(cx + shake, cy);
+      if (t < 1) requestAnimationFrame(frame); else { setHookPos(cx, cy); resolve(); }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// ---- 钩子和福袋一起上升 ----
+function animateHookAndBagUp(fromX, fromY, toX, toY, floatBag, duration) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    const bagAboveHook = 40;
+    const bagW = (floatBag.offsetWidth || 110) / 2;
+    const bagH = (floatBag.offsetHeight || 80) / 2;
+    function frame(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = easeInOutCubic(t);
+      const x = fromX + (toX - fromX) * eased;
+      const y = fromY + (toY - fromY) * eased;
+      setHookPos(x, y);
+      floatBag.style.left = (x - bagW) + 'px';
+      floatBag.style.top = (y - bagH - bagAboveHook) + 'px';
+      if (t < 1) requestAnimationFrame(frame); else resolve();
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// ---- 显示两框和问题 ----
+function showBoxesAndQuestion(prob) {
+  const item = prob.item;
+  const unit = item.unit;
+  const name = item.name;
+
+  // 框1：原来有 X 个物品（始终显示总数）
+  boxTotalImg.src = item.file;
+  boxTotalText.textContent = '原来有' + prob.total + unit + name;
+
+  // 框2：根据类型显示"还剩"或"炸了"
+  boxResultImg.src = item.file;
+  if (prob.showRemaining) {
+    // 类型A：显示还剩 → 问炸了多少
+    boxResultText.textContent = '还剩' + prob.remaining + unit + name;
+    questionText.textContent = '问题：炸弹炸了多少' + unit + name + '？';
+  } else {
+    // 类型B：显示炸了 → 问还剩多少
+    boxResultText.textContent = '炸了' + prob.destroyed + unit + name;
+    questionText.textContent = '问题：现在还剩多少' + unit + name + '？';
+  }
+
+  questionText.classList.add('show');
+  hintText.style.opacity = '0';
+  btnReveal.classList.add('show');
+  hideFormula();
+  currentFormulaShown = false;
+}
+
+// ---- 显示算式 ----
+function revealFormula() {
+  if (isAnimating) return;
+  if (currentBagIndex < 0) return;
+  if (currentFormulaShown) return;
+
+  const prob = problems[currentBagIndex];
+  const unit = prob.item.unit;
+
+  // 被减数、减数、差取决于类型
+  //  类型A（显示还剩）：total － remaining ＝ destroyed
+  //  类型B（显示炸了）：total － destroyed ＝ remaining
+  const minuend = prob.total;                           // 被减数（总数）
+  const subtrahend = prob.showRemaining ? prob.remaining : prob.destroyed; // 减数（框2显示的值）
+  const difference = prob.showRemaining ? prob.destroyed : prob.remaining; // 差（答案）
+
+  // 逐个弹出：total → − → subtrahend → = → difference（单位）
+  // 格式如：12 − 7 = 5（条） 或 12 − 5 = 7（条）
+  const formulaParts = [
+    { el: fp1,      text: minuend,   highlight: true, delay: 0 },
+    { el: fpMinus,  text: '−',       highlight: true, delay: 300 },
+    { el: fp2,      text: subtrahend, highlight: true, delay: 600 },
+    { el: fpEqual,  text: '=',       highlight: false, delay: 900 },
+    { el: fpTotal,  text: difference + '（' + unit + '）', highlight: true, delay: 1200 },
+  ];
+
+  formulaParts.forEach(({ el, text, highlight, delay }) => {
+    setTimeout(() => {
+      el.textContent = text;
+      el.classList.add('show');
+      if (highlight) {
+        el.classList.add('highlight');
+        setTimeout(() => el.classList.remove('highlight'), 600);
+      }
+      if (el === fpTotal) playRevealFinal();
+      else playRevealTick();
+    }, delay);
+  });
+
+  currentFormulaShown = true;
+}
+
+function checkAllMined() {
+  const allMined = problems.every(p => p.mined);
+  if (allMined) {
+    hintText.textContent = '🎉 全部挖完啦！点击"再来一次"换新题目吧～';
+    hintText.style.opacity = '1';
+    btnReset.classList.add('show');
+  }
+}
+
+// ============================================================
+// 窗口大小变化
+// ============================================================
+window.addEventListener('resize', () => {
+  updateInstrumentDot();
+  if (!isAnimating) {
+    const anchor = getInstrumentAnchor();
+    setHookPos(anchor.x, anchor.y);
+  }
+});
+
+// ============================================================
+// 启动
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  initGame();
+});
+</script>
+</body>
+</html>

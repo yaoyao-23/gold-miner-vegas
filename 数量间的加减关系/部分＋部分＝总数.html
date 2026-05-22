@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>部分＋部分＝总数</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  background: linear-gradient(180deg, #fff8e1 0%, #ffe0b2 30%, #ffcc80 60%, #ffb74d 100%);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+  overflow-x: hidden;
+}
+
+/* ===== 返回首页按钮 ===== */
+.back-btn {
+  position: absolute;
+  top: 14px; left: 18px; /* ← 返回按钮位置 */
+  z-index: 30;
+  font-size: 16px;
+  color: #5d4037;
+  text-decoration: none;
+  background: rgba(255,255,255,0.75);
+  padding: 6px 14px;
+  border-radius: 14px;
+  transition: background 0.2s, transform 0.15s;
+}
+.back-btn:hover { background: rgba(255,255,255,0.95); transform: scale(1.06); }
+
+/* ===== 标题（在游戏容器内） ===== */
+/* 【调整】标题位置：用 padding / margin 微调 */
+.title-bar {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 0 10px 0; /* ← 标题下边距（与下方内容的间距） */
+}
+.title-text {
+  font-size: 36px; /* ← 标题字号 */
+  font-weight: bold;
+  color: #5d4037;
+  text-shadow: 0 2px 6px rgba(0,0,0,0.12);
+}
+
+/* ===== 游戏容器 ===== */
+/* 【调整】容器内边距、最小高度 */
+.game-container {
+  position: relative;
+  width: 124vw;
+  max-width: 1300px;
+  background: linear-gradient(180deg, #e8d5b0 0%, #d4b896 30%, #c9a87c 60%, #b8956a 100%);
+  border-radius: 24px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3), inset 0 0 80px rgba(0,0,0,0.08);
+  padding: 20px 24px 24px; /* ← 容器内边距 */
+  margin: 8px auto;
+  min-height: 320px; /* ← 容器最小高度 */
+}
+
+/* ===== SVG 绳索层 ===== */
+/* 【调整】绳索颜色、粗细 */
+/* 绳索起点/终点位置由 JS 动态控制，搜 "updateRope" */
+.rope-svg {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+  z-index: 15; /* ← 绳索层级（低于钩子16，高于福袋5） */
+}
+#ropeLine {
+  stroke: #6d4c2e; /* ← 绳索颜色 */
+  stroke-width: 5;  /* ← 绳索粗细 */
+  stroke-linecap: round;
+  filter: drop-shadow(0 1px 2px rgba(0,0,0,0.3));
+}
+
+/* ===== 钩子 ===== */
+/* 【调整】钩子大小 */
+/* 钩子位置由 JS 动态控制，搜 "setHookPos"、"positionInitialHook" */
+.hook-img {
+  position: absolute;
+  z-index: 16;  /* ← 钩子层级（在绳索之上） */
+  pointer-events: none;
+  width: 150px; /* ← 钩子宽度 */
+  height: auto;
+  transition: none;
+}
+@media (max-width: 600px) {
+  .hook-img { width: 42px; } /* ← 小屏钩子宽度 */
+}
+
+/* ===== 浮动福袋（动画中用） ===== */
+/* 【调整】浮动福袋大小、弹开缩放倍数 */
+.floating-bag {
+  position: absolute;
+  z-index: 17;
+  pointer-events: none;
+  width: 110px; /* ← 浮动福袋宽度 */
+  height: auto;
+  transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.floating-bag.pop {
+  transform: scale(1.8); /* ← 弹开放大倍数 */
+  opacity: 0;
+}
+
+/* ===== 顶部区域：矿工 + 物品堆 ===== */
+/* 【调整】顶部区域间距、最小高度 */
+.top-area {
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 42px; /* ← 矿工与物品堆的左右间距 */
+  position: relative;
+  z-index: 5;
+  margin-bottom: 24px; /* ← 顶部区与福袋区间距 */
+  min-height: 220px; /* ← 顶部区最小高度 */
+}
+
+/* 物品堆 */
+/* 【调整】物品图大小、数量文字大小 */
+.item-pile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px; /* ← 物品图与数量文字间距 */
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+  min-width: 140px; /* ← 物品堆最小宽度 */
+}
+.item-pile.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+.item-pile-img {
+  width: 130px;  /* ← 物品图宽度 */
+  height: 130px; /* ← 物品图高度 */
+  object-fit: contain;
+  filter: drop-shadow(0 4px 8px rgba(0,0,0,0.2));
+}
+.item-pile-count {
+  font-size: 30px; /* ← 数量文字大小 */
+  font-weight: bold;
+  color: #3e2723;
+  background: rgba(255,255,255,0.85);
+  border-radius: 14px;
+  padding: 6px 20px; /* ← 数量标签内边距 */
+  box-shadow: 0 3px 10px rgba(0,0,0,0.12);
+  white-space: nowrap;
+}
+
+/* 矿工 */
+/* 【调整】矿工图大小 */
+.miner-wrapper {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.miner-img {
+  width: 300px; /* ← 矿工宽度 */
+  height: auto;
+  filter: drop-shadow(0 4px 10px rgba(0,0,0,0.25));
+}
+/* 【调整】仪器指示点大小、颜色、在矿工上的位置 */
+.instrument-dot {
+  position: absolute;
+  width: 16px;  /* ← 指示点大小 */
+  height: 16px;
+  background: #ff5722; /* ← 指示点颜色 */
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 8px rgba(255,87,34,0.6);
+  z-index: 18;
+  pointer-events: none;
+}
+
+/* ===== 福袋网格 ===== */
+/* 【调整】福袋大小、间距 */
+.bag-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 20px 16px; /* ← 福袋行列间距（行距 列距） */
+  justify-items: center;
+  position: relative;
+  z-index: 5;
+  padding: 0 10px;
+}
+.bag-item {
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px; /* ← 福袋图与编号间距 */
+  transition: transform 0.2s, opacity 0.3s;
+  position: relative;
+}
+.bag-item:hover:not(.mined) {
+  transform: translateY(-8px) scale(1.08); /* ← 悬浮上移+放大 */
+}
+.bag-item:active:not(.mined) {
+  transform: scale(0.94);
+}
+.bag-item.mined {
+  cursor: default;
+  opacity: 0.4;
+  transform: none;
+}
+.bag-img {
+  width: 150px; /* ← 福袋宽度 */
+  height: auto;
+  filter: drop-shadow(0 3px 8px rgba(0,0,0,0.2));
+}
+.bag-number {
+  font-size: 18px; /* ← 福袋编号大小 */
+  font-weight: bold;
+  color: #795548;
+}
+.bag-item.mined .bag-number::after {
+  content: ' ✓';
+  color: #4caf50;
+}
+
+/* ===== 底部区域 ===== */
+/* 【调整】底部区间距 */
+.bottom-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px; /* ← 底部各元素间距 */
+  margin-top: -10px; /* ← 底部区与福袋区间距 */
+  position: relative;
+  z-index: 5;
+  min-height: 110px;
+}
+
+/* 提示文字 */
+/* 【调整】提示文字位置：改 margin-top（正值=下移，负值=上移） */
+/* 【调整】提示文字大小：改 font-size */
+.hint-text {
+  font-size: 20px; /* ← 提示文字大小 */
+  color: #6d4c41;
+  text-align: center;
+  margin-top: 8px;  /* ← 提示文字向下移动距离 */
+  transition: opacity 0.3s;
+}
+
+/* 问题 + 按钮 同行容器 */
+/* 【调整】问题与按钮的间距：改 gap */
+/* 【调整】整行位置：改 margin */
+.question-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;     /* ← 问题文字与按钮的间距 */
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;     /* ← 问题行外边距 */
+}
+
+/* 问题 */
+/* 【调整】问题文字大小：改 font-size */
+.question-text {
+  font-size: 30px; /* ← 问题文字大小 */
+  font-weight: bold;
+  color: #bf360c;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+}
+.question-text.show {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* 按钮行（仅"再来一次"按钮） */
+/* 【调整】按钮行位置：用 margin 上下左右移动 */
+.btn-row {
+  display: flex;
+  gap: 14px;    /* ← 按钮之间间距 */
+  justify-content: center;
+  flex-wrap: wrap;
+  width: 100%;
+  margin: 0;    /* ← 按钮行外边距 */
+  padding: 6px 0; /* ← 按钮行内边距 */
+}
+.btn {
+  border: none;
+  border-radius: 22px;
+  padding: 12px 32px; /* ← 按钮内边距 */
+  font-size: 22px; /* ← 按钮文字大小 */
+  font-weight: bold;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s, opacity 0.3s;
+  font-family: inherit;
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+}
+.btn.show {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+.btn:hover { transform: scale(1.06); }
+.btn:active { transform: scale(0.95); }
+.btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+/* 【调整】显示算式按钮：大小、内边距 */
+.btn-reveal {
+  background: linear-gradient(135deg, #ff9800, #f57c00);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(255,152,0,0.4);
+  font-size: 24px; /* ← 显示算式按钮文字大小 */
+  padding: 14px 40px; /* ← 显示算式按钮内边距 */
+}
+.btn-reveal:hover { box-shadow: 0 6px 22px rgba(255,152,0,0.55); }
+
+.btn-reset {
+  background: #fff;
+  color: #5d4037;
+  border: 2px solid #bcaaa4;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
+}
+
+/* ===== 算式区 ===== */
+/* 【调整】算式区位置：改 margin-top（负值=上移，正值=下移） */
+/* 【调整】算式各部分间距：改 gap */
+/* 【调整】算式字号：改 .formula-part 的 font-size */
+.formula-area {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px; /* ← 算式各部分间距（数字与运算符之间） */
+  flex-wrap: wrap;
+  margin: -6px 0 0 0; /* ← 算式区外边距（上 右 下 左），上负值=上移 */
+  padding: 6px 0;     /* ← 算式区内边距 */
+  min-height: 52px;
+}
+.formula-part {
+  font-size: 36px; /* ← 算式字号 */
+  font-weight: bold;
+  color: #3e2723;
+  opacity: 0;
+  transform: scale(0);
+  transition: opacity 0.35s ease-out, transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+.formula-part.show {
+  opacity: 1;
+  transform: scale(1);
+}
+.formula-part.highlight {
+  color: #e65100;
+  text-shadow: 0 2px 10px rgba(230,81,0,0.4);
+  animation: glowPulse 0.6s ease-out;
+}
+@keyframes glowPulse {
+  0% { transform: scale(1); }
+  40% { transform: scale(1.35); }
+  70% { transform: scale(0.9); }
+  100% { transform: scale(1); }
+}
+
+/* ===== 粒子特效 ===== */
+.particle {
+  position: absolute;
+  pointer-events: none;
+  z-index: 30;
+  font-size: 24px;
+  animation: particleFly 0.8s ease-out forwards;
+}
+@keyframes particleFly {
+  0% { opacity: 1; transform: translate(0,0) scale(1); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(0.3); }
+}
+
+/* ===== 响应式 ===== */
+@media (max-width: 900px) {
+  .title-text { font-size: 28px; }
+  .game-container { padding: 14px 12px 18px; min-height: 620px; }
+  .top-area { gap: 18px; min-height: 170px; }
+  .miner-img { width: 130px; }
+  .item-pile-img { width: 90px; height: 90px; }
+  .item-pile-count { font-size: 24px; padding: 4px 16px; }
+  .bag-grid { gap: 14px 10px; }
+  .bag-img { width: 80px; }
+  .question-text { font-size: 26px; }
+  .formula-part { font-size: 30px; }
+  .btn { font-size: 20px; padding: 10px 26px; }
+  .btn-reveal { font-size: 22px; padding: 12px 32px; }
+  .hook-img { width: 48px; }
+  .floating-bag { width: 80px; }
+}
+
+@media (max-width: 600px) {
+  .title-text { font-size: 24px; }
+  .game-container { padding: 10px 8px 14px; border-radius: 16px; min-height: 540px; }
+  .top-area { gap: 10px; min-height: 140px; }
+  .miner-img { width: 90px; }
+  .item-pile { min-width: 80px; }
+  .item-pile-img { width: 60px; height: 60px; }
+  .item-pile-count { font-size: 18px; padding: 3px 12px; border-radius: 10px; }
+  .bag-grid { grid-template-columns: repeat(5, 1fr); gap: 8px 5px; }
+  .bag-img { width: 56px; }
+  .bag-number { font-size: 14px; }
+  .question-text { font-size: 22px; }
+  .formula-part { font-size: 24px; }
+  .btn { font-size: 17px; padding: 8px 18px; border-radius: 16px; }
+  .btn-reveal { font-size: 19px; padding: 10px 24px; }
+  .hook-img { width: 36px; }
+  .hint-text { font-size: 16px; }
+  .floating-bag { width: 60px; }
+}
+</style>
+</head>
+<body>
+
+<!-- 游戏区 -->
+<div class="game-container" id="gameContainer">
+
+  <!-- 返回首页 -->
+  <a class="back-btn" href="首页.html">← 返回首页</a>
+
+  <!-- 标题 -->
+  <div class="title-bar">
+    <div class="title-text">部分 ＋ 部分 ＝ 总数</div>
+  </div>
+
+  <!-- SVG 绳索 -->
+  <svg class="rope-svg" id="ropeSvg">
+    <line id="ropeLine" x1="0" y1="0" x2="0" y2="0" visibility="hidden"/>
+  </svg>
+
+  <!-- 钩子 -->
+  <img class="hook-img" id="hookImg" src="素材/钩子.png" alt="钩子" style="visibility:hidden;">
+
+  <!-- 浮动福袋（动画中创建） -->
+
+  <!-- 顶部：物品堆 + 矿工 -->
+  <div class="top-area" id="topArea">
+    <div class="item-pile" id="pileLeft">
+      <img class="item-pile-img" id="pileLeftImg" src="" alt="">
+      <span class="item-pile-count" id="pileLeftCount"></span>
+    </div>
+    <div class="miner-wrapper" id="minerWrapper">
+      <img class="miner-img" id="minerImg" src="素材/矿工.png" alt="矿工">
+      <div class="instrument-dot" id="instrumentDot"></div>
+    </div>
+    <div class="item-pile" id="pileRight">
+      <img class="item-pile-img" id="pileRightImg" src="" alt="">
+      <span class="item-pile-count" id="pileRightCount"></span>
+    </div>
+  </div>
+
+  <!-- 福袋网格 -->
+  <div class="bag-grid" id="bagGrid">
+  </div>
+
+  <!-- 底部区域 -->
+  <div class="bottom-area" id="bottomArea">
+    <div class="hint-text" id="hintText">👆 点击一个福袋开始挖宝吧！</div>
+    <div class="question-row">
+      <div class="question-text" id="questionText"></div>
+      <button class="btn btn-reveal" id="btnReveal" onclick="revealFormula()">🔍 显示算式</button>
+    </div>
+    <div class="formula-area" id="formulaArea">
+      <span class="formula-part" id="fp1"></span>
+      <span class="formula-part" id="fpPlus">＋</span>
+      <span class="formula-part" id="fp2"></span>
+      <span class="formula-part" id="fpEqual">＝</span>
+      <span class="formula-part" id="fpTotal"></span>
+    </div>
+    <div class="btn-row">
+      <button class="btn btn-reset" id="btnReset" onclick="resetGame()">🔄 再来一次</button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ╔══════════════════════════════════════════════════════════════╗
+// ║  黄金矿工 - 精细调整指南                                    ║
+// ╠══════════════════════════════════════════════════════════════╣
+// ║  搜 "【调整】" 快速定位所有可调参数                          ║
+// ║                                                            ║
+// ║  ▸ 素材大小（CSS）：                                       ║
+// ║    矿工     → .miner-img       width                       ║
+// ║    钩子     → .hook-img        width                       ║
+// ║    福袋     → .bag-img         width                       ║
+// ║    物品图   → .item-pile-img   width/height                ║
+// ║    浮袋     → .floating-bag    width                       ║
+// ║    福袋间距 → .bag-grid        gap                         ║
+// ║    标题字号 → .title-text      font-size                   ║
+// ║    问题字号 → .question-text   font-size                   ║
+// ║    算式字号 → .formula-part    font-size                   ║
+// ║    按钮大小 → .btn-reveal      font-size / padding         ║
+// ║                                                            ║
+// ║  ▸ 位置调整（CSS）：                                       ║
+// ║    标题位置 → .title-bar        padding                   ║
+// ║    提示文字 → .hint-text        margin-top（正值=下移）    ║
+// ║    问题按钮 → .question-row     gap / margin              ║
+// ║    算式位置 → .formula-area     margin-top（负值=上移）    ║
+// ║    重置按钮 → .btn-row          margin                    ║
+// ║    物品堆位 → .top-area         gap / min-height          ║
+// ║    底部区间 → .bottom-area      gap / margin-top          ║
+// ║                                                            ║
+// ║  ▸ 钩子/绳索/动画（JS）：                                  ║
+// ║    仪器锚点 → getInstrumentAnchor 内 xBias / yBias        ║
+// ║    指示红点 → updateInstrumentDot 内 leftBias / topBias   ║
+// ║    钩子初始 → hookOffsetY / ropeInitLen                   ║
+// ║    钩子中心 → setHookPos 内 hookCenterOffsetX/Y           ║
+// ║    绳索连钩 → updateRope 内 ropeConnectY                  ║
+// ║    下降时长 → DOWN_DURATION                               ║
+// ║    上升时长 → UP_DURATION                                 ║
+// ║    福袋终点 → BAG_END_OFFSET_Y                            ║
+// ║    福袋上方 → bagAboveHook                                ║
+// ║    物品/量词 → ITEMS 数组                                 ║
+// ╚══════════════════════════════════════════════════════════════╝
+
+// ============================================================
+// 物品库：文件名 → 显示名 + 量词
+// 【调整】增删改物品、修改量词都在这里
+// ============================================================
+const ITEMS = [
+  { file: '素材/物品/鱼.png', name: '鱼', unit: '条' },
+  { file: '素材/物品/书.png', name: '书', unit: '本' },
+  { file: '素材/物品/草莓.png', name: '草莓', unit: '颗' },
+  { file: '素材/物品/铅笔.png', name: '铅笔', unit: '支' },
+  { file: '素材/物品/小车.png', name: '小车', unit: '辆' },
+  { file: '素材/物品/章鱼.png', name: '章鱼', unit: '只' },
+  { file: '素材/物品/海星.png', name: '海星', unit: '个' },
+  { file: '素材/物品/海螺.png', name: '海螺', unit: '个' },
+  { file: '素材/物品/宝箱.png', name: '宝箱', unit: '个' },
+  { file: '素材/物品/桃.png', name: '桃', unit: '个' },
+  { file: '素材/物品/西瓜.png', name: '西瓜', unit: '个' },
+  { file: '素材/物品/瓶子.png', name: '瓶子', unit: '个' },
+  { file: '素材/物品/书包.png', name: '书包', unit: '个' },
+  { file: '素材/物品/水壶.png', name: '水壶', unit: '个' },
+  { file: '素材/物品/杯子.png', name: '杯子', unit: '个' },
+  { file: '素材/物品/珍珠.png', name: '珍珠', unit: '颗' },
+  { file: '素材/物品/纸船.png', name: '纸船', unit: '只' },
+  { file: '素材/物品/抽纸.png', name: '抽纸', unit: '包' },
+  { file: '素材/物品/相机.png', name: '相机', unit: '台' },
+  { file: '素材/物品/可乐.png', name: '可乐', unit: '瓶' },
+  { file: '素材/物品/橡皮.png', name: '橡皮', unit: '块' },
+  { file: '素材/物品/树叶.png', name: '树叶', unit: '片' },
+  { file: '素材/物品/树枝.png', name: '树枝', unit: '根' },
+  { file: '素材/物品/本子.png', name: '本子', unit: '本' },
+];
+
+// ============================================================
+// DOM 引用
+// ============================================================
+const gameContainer = document.getElementById('gameContainer');
+const hookImg = document.getElementById('hookImg');
+const ropeLine = document.getElementById('ropeLine');
+const ropeSvg = document.getElementById('ropeSvg');
+const bagGrid = document.getElementById('bagGrid');
+const minerWrapper = document.getElementById('minerWrapper');
+const minerImg = document.getElementById('minerImg');
+const instrumentDot = document.getElementById('instrumentDot');
+const pileLeft = document.getElementById('pileLeft');
+const pileRight = document.getElementById('pileRight');
+const pileLeftImg = document.getElementById('pileLeftImg');
+const pileRightImg = document.getElementById('pileRightImg');
+const pileLeftCount = document.getElementById('pileLeftCount');
+const pileRightCount = document.getElementById('pileRightCount');
+const questionText = document.getElementById('questionText');
+const hintText = document.getElementById('hintText');
+const btnReveal = document.getElementById('btnReveal');
+const btnReset = document.getElementById('btnReset');
+const formulaArea = document.getElementById('formulaArea');
+const fp1 = document.getElementById('fp1');
+const fpPlus = document.getElementById('fpPlus');
+const fp2 = document.getElementById('fp2');
+const fpEqual = document.getElementById('fpEqual');
+const fpTotal = document.getElementById('fpTotal');
+
+// ============================================================
+// 状态
+// ============================================================
+let problems = [];             // 10道题目，每道包含 { item, part1, part2, total, mined }
+let currentBagIndex = -1;      // 当前正在操作的福袋索引
+let isAnimating = false;       // 是否正在动画中
+let currentFormulaShown = false; // 当前题目的算式是否已显示
+
+// ============================================================
+// Web Audio 音效
+// ============================================================
+let audioCtx = null;
+function getCtx() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, dur, type = 'sine', vol = 0.2) {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = type;
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(vol, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + dur);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + dur);
+  } catch(e) {}
+}
+
+function playHookDown() {
+  // 钩子下降：滑音
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(600, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(300, ctx.currentTime + 0.5);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.55);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.55);
+  } catch(e) {}
+}
+
+function playHookUp() {
+  try {
+    const ctx = getCtx();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(300, ctx.currentTime);
+    osc.frequency.linearRampToValueAtTime(800, ctx.currentTime + 0.6);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.65);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(); osc.stop(ctx.currentTime + 0.65);
+  } catch(e) {}
+}
+
+function playGrab() {
+  playTone(200, 0.1, 'square', 0.1);
+  setTimeout(() => playTone(250, 0.1, 'square', 0.1), 80);
+}
+
+function playTreasure() {
+  try {
+    const ctx = getCtx();
+    [523, 659, 784, 1047].forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = f;
+      gain.gain.setValueAtTime(0.25, ctx.currentTime + i * 0.1);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + i * 0.1 + 0.3);
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.start(ctx.currentTime + i * 0.1);
+      osc.stop(ctx.currentTime + i * 0.1 + 0.3);
+    });
+  } catch(e) {}
+}
+
+function playRevealTick() {
+  playTone(880, 0.12, 'sine', 0.15);
+}
+
+function playRevealFinal() {
+  playTone(1047, 0.35, 'triangle', 0.3);
+}
+
+// ============================================================
+// 获取仪器锚点坐标（相对于 gameContainer）
+// ============================================================
+// ============================================================
+// 仪器锚点：绳索起点，钩子初始位置
+// 【调整】修改 xBias / yBias 来微调仪器连接点位置
+// ============================================================
+function getInstrumentAnchor() {
+  const minerRect = minerWrapper.getBoundingClientRect();
+  const containerRect = gameContainer.getBoundingClientRect();
+  const xBias = 0;  // ← 水平偏移（正值右移，负值左移）
+  const yBias = -60; // ← 垂直偏移（正值下移，负值上移）
+  const x = minerRect.left + minerRect.width * 0.5 - containerRect.left + xBias;
+  const y = minerRect.bottom - containerRect.top + yBias;
+  return { x, y };
+}
+
+// 更新仪器指示点位置（相对于 minerWrapper）
+// 【调整】修改 left / top 的计算值来移动红点
+function updateInstrumentDot() {
+  const dotSize = 8; // ← 指示点半径（配合 CSS 的 width/height）
+  const leftBias = 0;  // ← 红点水平微调
+  const topBias = -70;  // ← 红点垂直微调（负值=往上）
+  instrumentDot.style.left = (minerWrapper.offsetWidth / 2 - dotSize + leftBias) + 'px';
+  instrumentDot.style.top = (minerWrapper.offsetHeight + topBias) + 'px';
+}
+
+// ============================================================
+// 生成10道题目（和 ≤ 100，各部分 ≥ 1，每个福袋不同物品）
+// ============================================================
+function generateProblems() {
+  const list = [];
+  // 随机打乱物品顺序，取前10个（不够就循环）
+  const shuffled = [...ITEMS].sort(() => Math.random() - 0.5);
+  for (let i = 0; i < 10; i++) {
+    const total = Math.floor(Math.random() * 99) + 2; // 2 ~ 100
+    const part1 = Math.floor(Math.random() * (total - 1)) + 1;
+    const part2 = total - part1;
+    const item = shuffled[i % shuffled.length]; // 每个福袋分配不同物品
+    list.push({ item, part1, part2, total, mined: false });
+  }
+  return list;
+}
+
+// ============================================================
+// 渲染福袋网格
+// ============================================================
+function renderBags() {
+  bagGrid.innerHTML = '';
+  problems.forEach((prob, i) => {
+    const div = document.createElement('div');
+    div.className = 'bag-item';
+    div.innerHTML = `
+      <img class="bag-img" src="素材/两个福袋.png" alt="福袋">
+      <span class="bag-number">${i + 1}</span>
+    `;
+    div.addEventListener('click', () => onBagClick(i, div));
+    bagGrid.appendChild(div);
+  });
+}
+
+// ============================================================
+// 重置所有显示
+// ============================================================
+function resetDisplay() {
+  pileLeft.classList.remove('show');
+  pileRight.classList.remove('show');
+  questionText.classList.remove('show');
+  questionText.textContent = '';
+  hintText.textContent = '👆 点击一个福袋开始挖宝吧！';
+  hintText.style.opacity = '1';
+  btnReveal.classList.remove('show');
+  btnReset.classList.remove('show');
+  hideFormula();
+  hookImg.style.visibility = 'hidden';
+  ropeLine.setAttribute('visibility', 'hidden');
+  currentFormulaShown = false;
+
+  // 清除所有福袋 mined 状态
+  document.querySelectorAll('.bag-item').forEach(el => el.classList.remove('mined'));
+}
+
+function hideFormula() {
+  [fp1, fpPlus, fp2, fpEqual, fpTotal].forEach(el => {
+    el.classList.remove('show', 'highlight');
+    el.textContent = '';
+  });
+  fpPlus.textContent = '+';
+  fpEqual.textContent = '=';
+}
+
+// ============================================================
+// 初始化/重置游戏
+// ============================================================
+function initGame() {
+  // 生成题目（每个福袋随机分配不同物品）
+  problems = generateProblems();
+  currentBagIndex = -1;
+  isAnimating = false;
+  currentFormulaShown = false;
+
+  resetDisplay();
+  renderBags();
+
+  // ============================================================
+  // 设置钩子初始位置（等图片加载完成后计算）
+  // 【调整】修改 hookOffsetY 来调整钩子挂在仪器下方的距离
+  // ============================================================
+  function positionInitialHook() {
+    updateInstrumentDot();
+    const anchor = getInstrumentAnchor();
+    const hw = hookImg.offsetWidth / 2 || 22;
+    const hh = hookImg.offsetHeight / 2 || 22;
+    hookImg.style.left = (anchor.x - hw) + 'px';
+    const hookOffsetY = 20;  // ← 钩子挂在仪器下方的距离（像素）
+    const ropeInitLen = 14;  // ← 初始绳索长度（像素）
+    hookImg.style.top = (anchor.y - hh + hookOffsetY) + 'px';
+    hookImg.style.visibility = 'visible';
+    ropeLine.setAttribute('x1', anchor.x);
+    ropeLine.setAttribute('y1', anchor.y);
+    ropeLine.setAttribute('x2', anchor.x);
+    ropeLine.setAttribute('y2', anchor.y + ropeInitLen);
+    ropeLine.setAttribute('visibility', 'visible');
+  }
+
+  // 等待矿工图加载（否则 getBoundingClientRect 不准）
+  if (minerImg.complete && minerImg.naturalWidth > 0) {
+    positionInitialHook();
+  } else {
+    minerImg.addEventListener('load', positionInitialHook, { once: true });
+    // 兜底：200ms 后重试
+    setTimeout(() => {
+      if (hookImg.style.visibility === 'hidden') positionInitialHook();
+    }, 300);
+  }
+}
+
+function resetGame() {
+  if (isAnimating) return;
+  // 检查是否所有福袋都挖完
+  const allMined = problems.every(p => p.mined);
+  if (!allMined) {
+    // 还有未挖的，不允许重置
+    return;
+  }
+  initGame();
+}
+
+// ============================================================
+// 辅助：等待
+// ============================================================
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// ============================================================
+// 缓动函数
+// ============================================================
+function easeInOutCubic(t) {
+  return t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+}
+
+// ============================================================
+// 更新绳索线
+// 【调整】绳索起点偏移：修改 anchor 的计算（见 getInstrumentAnchor）
+// 【调整】绳索终点连钩子位置：ropeConnectY 控制连接在钩子上的高度
+//         ropeConnectY = -hookImg高度的一半 → 连到钩子顶部
+//         ropeConnectY = 0 → 连到钩子中心
+//         ropeConnectY = +值 → 连到钩子下方
+// ============================================================
+function updateRope(hookX, hookY) {
+  const anchor = getInstrumentAnchor();
+  const hookHalfH = hookImg.offsetHeight / 2 || 75;
+  const ropeConnectY = -hookHalfH + 58; // ← 绳索连接到钩子顶部（+8 微调向下几像素）
+  ropeLine.setAttribute('x1', anchor.x);
+  ropeLine.setAttribute('y1', anchor.y);
+  ropeLine.setAttribute('x2', hookX);
+  ropeLine.setAttribute('y2', hookY + ropeConnectY);
+}
+
+// ============================================================
+// 更新钩子位置 + 绳索
+// 【调整】钩子中心偏移：修改 hookCenterOffsetX/Y
+// ============================================================
+function setHookPos(x, y) {
+  const hw = hookImg.offsetWidth / 2;
+  const hh = hookImg.offsetHeight / 2;
+  const hookCenterOffsetX = 0; // ← 钩子中心水平偏移（正值=右移）
+  const hookCenterOffsetY = 10; // ← 钩子中心垂直偏移（正值=下移）
+  hookImg.style.left = (x - hw + hookCenterOffsetX) + 'px';
+  hookImg.style.top = (y - hh + hookCenterOffsetY) + 'px';
+  updateRope(x, y);
+}
+
+// ============================================================
+// 粒子特效
+// ============================================================
+function spawnParticles(x, y, count = 8) {
+  const emojis = ['⭐', '✨', '💎', '🌟', '💰'];
+  for (let i = 0; i < count; i++) {
+    const p = document.createElement('span');
+    p.className = 'particle';
+    p.textContent = emojis[Math.floor(Math.random() * emojis.length)];
+    p.style.left = x + 'px';
+    p.style.top = y + 'px';
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 40 + Math.random() * 80;
+    p.style.setProperty('--dx', Math.cos(angle) * dist + 'px');
+    p.style.setProperty('--dy', Math.sin(angle) * dist - 30 + 'px');
+    gameContainer.appendChild(p);
+    p.addEventListener('animationend', () => p.remove());
+  }
+}
+
+// ============================================================
+// 核心动画：挖宝
+// ============================================================
+async function onBagClick(index, bagEl) {
+  if (isAnimating) return;
+  if (problems[index].mined) return;
+
+  isAnimating = true;
+  currentBagIndex = index;
+  currentFormulaShown = false;
+  const prob = problems[index];
+
+  // 隐藏上一题的显示
+  pileLeft.classList.remove('show');
+  pileRight.classList.remove('show');
+  questionText.classList.remove('show');
+  btnReveal.classList.remove('show');
+  hideFormula();
+
+  // 获取福袋中心坐标
+  const bagRect = bagEl.getBoundingClientRect();
+  const containerRect = gameContainer.getBoundingClientRect();
+  const bagCenterX = bagRect.left + bagRect.width / 2 - containerRect.left;
+  const bagCenterY = bagRect.top + bagRect.height / 2 - containerRect.top;
+
+  // 获取仪器锚点
+  const anchor = getInstrumentAnchor();
+
+  // ---- 阶段1：钩子下降 ----
+  // 【调整】下降动画时长（毫秒）
+  const DOWN_DURATION = 550;
+  playHookDown();
+  await animateHookTo(anchor.x, anchor.y, bagCenterX, bagCenterY, DOWN_DURATION);
+
+  // ---- 阶段2：抓到福袋 ----
+  // 【调整】晃动时长（毫秒）
+  const SHAKE_DURATION = 200;
+  playGrab();
+  await shakeHook(bagCenterX, bagCenterY, SHAKE_DURATION);
+
+  // ---- 阶段3：钩子 + 福袋一起上升 ----
+  // 【调整】上升动画时长（毫秒）、福袋到达的终点偏移
+  const UP_DURATION = 650;
+  const BAG_END_OFFSET_Y = -40; // ← 福袋到达矿工旁时，相对仪器锚点的垂直偏移
+  playHookUp();
+
+  // 创建浮动福袋副本（跟随钩子飞行）
+  const floatBagHalfW = 55; // ← 浮动福袋半宽（= CSS .floating-bag width / 2）
+  const floatBagHalfH = 40; // ← 浮动福袋半高（估算）
+  const floatBag = document.createElement('img');
+  floatBag.className = 'floating-bag';
+  floatBag.src = '素材/两个福袋.png';
+  floatBag.style.left = (bagCenterX - floatBagHalfW) + 'px';
+  floatBag.style.top = (bagCenterY - floatBagHalfH) + 'px';
+  gameContainer.appendChild(floatBag);
+
+  // 福袋原位置变灰
+  bagEl.classList.add('mined');
+
+  // 同时动画钩子和浮动福袋上升
+  const endX = anchor.x;
+  const endY = anchor.y + BAG_END_OFFSET_Y;
+  await animateHookAndBagUp(
+    bagCenterX, bagCenterY,
+    endX, endY,
+    floatBag,
+    UP_DURATION
+  );
+
+  // ---- 阶段4：福袋打开 ----
+  // 【调整】粒子爆发位置、弹开停留时长
+  const POP_DELAY = 400; // ← 弹开后停留时间（毫秒）
+  floatBag.classList.add('pop');
+  const popX = anchor.x;
+  const popY = anchor.y - 60; // ← 弹开效果爆发位置
+  spawnParticles(popX, popY, 10);
+  playTreasure();
+
+  await sleep(POP_DELAY);
+  floatBag.remove();
+
+  // ---- 阶段5：显示物品和问题 ----
+  showItemsAndQuestion(prob);
+
+  // 重置钩子到仪器位置
+  setHookPos(anchor.x, anchor.y);
+
+  // 标记已挖
+  problems[index].mined = true;
+  isAnimating = false;
+
+  // 检查是否全部挖完
+  checkAllMined();
+}
+
+// ---- 动画：钩子移动到目标 ----
+function animateHookTo(fromX, fromY, toX, toY, duration) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    function frame(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = easeInOutCubic(t);
+      const x = fromX + (toX - fromX) * eased;
+      const y = fromY + (toY - fromY) * eased;
+      setHookPos(x, y);
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        resolve();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// ---- 动画：钩子晃动 ----
+function shakeHook(cx, cy, duration) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    function frame(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      const shake = Math.sin(t * Math.PI * 8) * (1 - t) * 8;
+      setHookPos(cx + shake, cy);
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        setHookPos(cx, cy);
+        resolve();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// ---- 动画：钩子和福袋一起上升 ----
+// 【调整】bagAboveHook 控制福袋在钩子上方的偏移距离
+function animateHookAndBagUp(fromX, fromY, toX, toY, floatBag, duration) {
+  return new Promise(resolve => {
+    const start = performance.now();
+    const bagAboveHook = 40; // ← 福袋在钩子上方的像素距离
+    const bagW = (floatBag.offsetWidth || 110) / 2;
+    const bagH = (floatBag.offsetHeight || 80) / 2;
+    function frame(now) {
+      const elapsed = now - start;
+      const t = Math.min(elapsed / duration, 1);
+      const eased = easeInOutCubic(t);
+      const x = fromX + (toX - fromX) * eased;
+      const y = fromY + (toY - fromY) * eased;
+      setHookPos(x, y);
+      floatBag.style.left = (x - bagW) + 'px';
+      floatBag.style.top = (y - bagH - bagAboveHook) + 'px';
+      if (t < 1) {
+        requestAnimationFrame(frame);
+      } else {
+        resolve();
+      }
+    }
+    requestAnimationFrame(frame);
+  });
+}
+
+// ---- 显示物品和问题 ----
+// 【调整】物品堆位置：改 CSS 中 .top-area 的 gap / min-height
+// 【调整】物品图大小：改 CSS 中 .item-pile-img 的 width/height
+// 【调整】问题位置：改 CSS 中 .question-text 的 margin
+function showItemsAndQuestion(prob) {
+  const item = prob.item;
+  // 设置物品图片（两堆相同物品）
+  pileLeftImg.src = item.file;
+  pileRightImg.src = item.file;
+
+  // 设置数量 + 单位（如：12条鱼）
+  pileLeftCount.textContent = prob.part1 + item.unit + item.name;
+  pileRightCount.textContent = prob.part2 + item.unit + item.name;
+
+  // 问题（如：问题：一共有多少条鱼？）
+  questionText.textContent = '问题：一共有多少' + item.unit + item.name + '？';
+
+  // 显示动画
+  pileLeft.classList.add('show');
+  pileRight.classList.add('show');
+  questionText.classList.add('show');
+  hintText.style.opacity = '0';
+  btnReveal.classList.add('show');
+
+  // 隐藏算式
+  hideFormula();
+  currentFormulaShown = false;
+}
+
+// ---- 显示算式 ----
+function revealFormula() {
+  if (isAnimating) return;
+  if (currentBagIndex < 0) return;
+  if (currentFormulaShown) return;
+
+  const prob = problems[currentBagIndex];
+  const unit = prob.item.unit;
+
+  // 逐个弹出：part1 → + → part2 → = → 总数（单位）
+  // 格式如：12 + 8 = 20（条）
+  const formulaParts = [
+    { el: fp1, text: prob.part1, highlight: true, delay: 0 },
+    { el: fpPlus, text: '+', highlight: true, delay: 300 },
+    { el: fp2, text: prob.part2, highlight: true, delay: 600 },
+    { el: fpEqual, text: '=', highlight: false, delay: 900 },
+    { el: fpTotal, text: prob.total + '（' + unit + '）', highlight: true, delay: 1200 },
+  ];
+
+  formulaParts.forEach(({ el, text, highlight, delay }) => {
+    setTimeout(() => {
+      el.textContent = text;
+      el.classList.add('show');
+      if (highlight) {
+        el.classList.add('highlight');
+        // 动画结束后保留颜色但移除动画类（防止重复触发）
+        setTimeout(() => el.classList.remove('highlight'), 600);
+      }
+      if (el === fpTotal) {
+        playRevealFinal();
+      } else {
+        playRevealTick();
+      }
+    }, delay);
+  });
+
+  currentFormulaShown = true;
+}
+
+// ---- 检查是否全部挖完 ----
+function checkAllMined() {
+  const allMined = problems.every(p => p.mined);
+  if (allMined) {
+    hintText.textContent = '🎉 全部挖完啦！点击"再来一次"换新题目吧～';
+    hintText.style.opacity = '1';
+    btnReset.classList.add('show');
+  }
+}
+
+// ============================================================
+// 窗口大小变化时更新仪器锚点和钩子位置
+// ============================================================
+window.addEventListener('resize', () => {
+  updateInstrumentDot();
+  if (!isAnimating) {
+    const anchor = getInstrumentAnchor();
+    setHookPos(anchor.x, anchor.y);
+  }
+});
+
+// ============================================================
+// 启动
+// ============================================================
+window.addEventListener('DOMContentLoaded', () => {
+  initGame();
+});
+</script>
+</body>
+</html>
