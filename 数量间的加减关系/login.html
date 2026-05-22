@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>黄金矿工 - 微信授权</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Microsoft YaHei', sans-serif;
+  background: linear-gradient(180deg, #fff8e1, #ffcc80);
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  user-select: none;
+}
+.card {
+  background: #fff;
+  border-radius: 20px;
+  padding: 40px 30px;
+  text-align: center;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  max-width: 420px; width: 90vw;
+}
+h2 { color: #5d4037; margin-bottom: 8px; font-size: 26px; }
+.sub { color: #8d6e63; font-size: 15px; margin-bottom: 24px; }
+#qrcode { display: inline-block; margin: 10px 0; min-height: 200px; }
+.tips { color: #999; font-size: 13px; margin-top: 18px; }
+.success-box { display: none; color: #2e7d32; }
+.success-box h3 { font-size: 20px; margin-bottom: 6px; }
+.success-box p { color: #666; font-size: 14px; }
+
+.admin-link {
+  margin-top: 30px; font-size: 12px; color: #bbb;
+  cursor: pointer; text-decoration: underline;
+}
+
+.admin-panel {
+  display: none; background: #fff; border-radius: 16px;
+  padding: 24px; margin-top: 16px; max-width: 420px; width: 90vw;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+.admin-panel h3 { font-size: 18px; color: #333; margin-bottom: 12px; }
+.admin-panel textarea {
+  width: 100%; height: 120px; border: 1px solid #ddd;
+  border-radius: 8px; padding: 10px; font-size: 13px;
+  font-family: monospace; resize: vertical;
+}
+.admin-panel button {
+  margin-top: 10px; padding: 8px 24px; border: none;
+  border-radius: 14px; background: #ff9800; color: #fff;
+  font-size: 15px; font-weight: bold; cursor: pointer;
+}
+.admin-panel .msg { margin-top: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+
+<div class="card" id="mainCard">
+  <h2>⛏️ 黄金矿工</h2>
+  <p class="sub" id="subText">请使用微信扫码授权</p>
+  <div id="qrcode"></div>
+  <p class="tips">仅已授权账号可进入课件</p>
+  <div class="success-box" id="successBox">
+    <h3>✅ 验证通过</h3>
+    <p>即将进入课件…</p>
+  </div>
+</div>
+
+<div class="admin-link" id="adminLink" onclick="toggleAdmin()">🔑 管理</div>
+
+<div class="admin-panel" id="adminPanel">
+  <h3>授权用户管理</h3>
+  <p style="font-size:13px;color:#666;margin-bottom:8px;">每行一个 openid。保存后即刻生效。</p>
+  <textarea id="adminTextarea"></textarea>
+  <button onclick="saveAllowList()">💾 保存</button>
+  <p class="msg" id="adminMsg"></p>
+  <p style="font-size:12px;color:#aaa;margin-top:8px;">
+    管理员密码：<input type="password" id="adminPwd" placeholder="输入密码解锁编辑" style="width:140px;padding:4px 8px;border:1px solid #ddd;border-radius:6px;">
+  </p>
+</div>
+
+<script src="https://res.wx.qq.com/connect/zh_CN/js/wxLogin.js"></script>
+<script>
+// ========== 改这里 ==========
+const WX_APPID = 'wxf4769dbe158e1599';            // 测试号 AppID
+const WORKER_URL = 'https://raspy-base-6942.yaoyao-23.workers.dev';
+const HOME_PAGE = 'https://yaoyao-23.github.io/gold-miner-vegas/数量间的加减关系/首页.html';
+const LOGIN_PAGE = 'https://yaoyao-23.github.io/gold-miner-vegas/数量间的加减关系/login.html';
+const ADMIN_PASSWORD = '123456';
+// =============================
+
+const DEFAULT_ALLOW = [];
+
+function getAllowList() {
+  try {
+    const raw = localStorage.getItem('wx_allow_list');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return DEFAULT_ALLOW;
+}
+
+function saveAllowListToLocal(list) {
+  localStorage.setItem('wx_allow_list', JSON.stringify(list));
+}
+
+// ========== 主流程 ==========
+const params = new URLSearchParams(window.location.search);
+const code = params.get('code');
+
+if (code) {
+  // 微信扫码回调 → 调用 Worker 换 openid
+  document.getElementById('subText').textContent = '正在验证…';
+  document.getElementById('qrcode').style.display = 'none';
+
+  fetch(WORKER_URL + '?code=' + code)
+    .then(r => r.json())
+    .then(data => {
+      if (data.openid) {
+        localStorage.setItem('wx_openid', data.openid);
+        window.location.href = LOGIN_PAGE; // 刷新清参数
+      } else {
+        document.getElementById('subText').textContent = '授权失败，请重试';
+      }
+    })
+    .catch(() => {
+      document.getElementById('subText').textContent = '网络错误，请重试';
+    });
+} else {
+  // 没有 code → 检查本地是否有 openid
+  const savedOpenid = localStorage.getItem('wx_openid');
+  const allowList = getAllowList();
+
+  if (savedOpenid && allowList.includes(savedOpenid)) {
+    document.getElementById('successBox').style.display = 'block';
+    document.getElementById('qrcode').style.display = 'none';
+    document.getElementById('subText').style.display = 'none';
+    setTimeout(() => { window.location.href = HOME_PAGE; }, 1000);
+  } else {
+    // 显示扫码 → 回调到 login.html 自己
+    new WxLogin({
+      id: 'qrcode',
+      appid: WX_APPID,
+      scope: 'snsapi_base',
+      redirect_uri: encodeURIComponent(LOGIN_PAGE),
+      state: 'auth',
+      style: 'black',
+      href: ''
+    });
+
+    if (savedOpenid) {
+      document.getElementById('subText').textContent = '当前微信未授权，请联系老师';
+    }
+  }
+}
+
+// ========== 管理员面板 ==========
+let adminUnlocked = false;
+
+function toggleAdmin() {
+  const panel = document.getElementById('adminPanel');
+  if (panel.style.display === 'block') {
+    panel.style.display = 'none';
+  } else {
+    panel.style.display = 'block';
+    loadAdminPanel();
+  }
+}
+
+function loadAdminPanel() {
+  const list = getAllowList();
+  document.getElementById('adminTextarea').value = list.join('\n');
+}
+
+document.getElementById('adminPwd').addEventListener('input', function() {
+  if (this.value === ADMIN_PASSWORD) {
+    adminUnlocked = true;
+    document.getElementById('adminTextarea').disabled = false;
+    document.getElementById('adminMsg').textContent = '✅ 已解锁，可以编辑';
+    document.getElementById('adminMsg').style.color = '#2e7d32';
+  } else {
+    adminUnlocked = false;
+    document.getElementById('adminTextarea').disabled = true;
+    document.getElementById('adminMsg').textContent = '🔒 输入密码解锁';
+    document.getElementById('adminMsg').style.color = '#999';
+  }
+});
+
+function saveAllowList() {
+  if (!adminUnlocked) {
+    document.getElementById('adminMsg').textContent = '❌ 请先输入管理员密码';
+    document.getElementById('adminMsg').style.color = '#c62828';
+    return;
+  }
+  const raw = document.getElementById('adminTextarea').value.trim();
+  const list = raw ? raw.split('\n').map(s => s.trim()).filter(Boolean) : [];
+  saveAllowListToLocal(list);
+  document.getElementById('adminMsg').textContent = '✅ 已保存 ' + list.length + ' 个授权账号';
+  document.getElementById('adminMsg').style.color = '#2e7d32';
+}
+</script>
+</body>
+</html>
