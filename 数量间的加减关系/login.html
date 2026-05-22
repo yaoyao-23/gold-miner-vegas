@@ -80,7 +80,6 @@ h2 { color: #5d4037; margin-bottom: 8px; font-size: 26px; }
   </p>
 </div>
 
-<script src="https://res.wx.qq.com/connect/zh_CN/js/wxLogin.js"></script>
 <script>
 // ========== 改这里 ==========
 const WX_APPID = 'wxf4769dbe158e1599';            // 测试号 AppID
@@ -137,16 +136,21 @@ if (code) {
     document.getElementById('subText').style.display = 'none';
     setTimeout(() => { window.location.href = HOME_PAGE; }, 1000);
   } else {
-    // 显示扫码 → 回调到 login.html 自己
-    new WxLogin({
-      id: 'qrcode',
-      appid: WX_APPID,
-      scope: 'snsapi_base',
-      redirect_uri: encodeURIComponent(LOGIN_PAGE),
-      state: 'auth',
-      style: 'black',
-      href: ''
-    });
+    // 显示微信扫码 → 直接生成二维码图片
+    const wxUrl = 'https://open.weixin.qq.com/connect/oauth2/authorize'
+      + '?appid=' + WX_APPID
+      + '&redirect_uri=' + encodeURIComponent(LOGIN_PAGE)
+      + '&response_type=code'
+      + '&scope=snsapi_base'
+      + '&state=auth'
+      + '#wechat_redirect';
+
+    // 用二维码 API 生成图片
+    const qrImg = document.createElement('img');
+    qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(wxUrl);
+    qrImg.style.width = '200px';
+    qrImg.style.height = '200px';
+    document.getElementById('qrcode').appendChild(qrImg);
 
     if (savedOpenid) {
       document.getElementById('subText').textContent = '当前微信未授权，请联系老师';
@@ -201,3 +205,4 @@ function saveAllowList() {
 </script>
 </body>
 </html>
+
