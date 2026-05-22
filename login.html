@@ -106,27 +106,18 @@ function saveAllowListToLocal(list) {
 // ========== 主流程 ==========
 const params = new URLSearchParams(window.location.search);
 const code = params.get('code');
+const openid = params.get('openid');
+const LOGIN_PAGE_CLEAN = window.location.href.split('?')[0]; // 当前页不带参数
 
 if (code) {
-  // 微信扫码回调 → 调用 Worker 换 openid
-  document.getElementById('subText').textContent = '正在验证…';
-  document.getElementById('qrcode').style.display = 'none';
-
-  fetch(WORKER_URL + '?code=' + code)
-    .then(r => r.json())
-    .then(data => {
-      if (data.openid) {
-        localStorage.setItem('wx_openid', data.openid);
-        window.location.href = LOGIN_PAGE; // 刷新清参数
-      } else {
-        document.getElementById('subText').textContent = '授权失败，请重试';
-      }
-    })
-    .catch(() => {
-      document.getElementById('subText').textContent = '网络错误，请重试';
-    });
+  // 微信回调带了 code → 跳 Worker 换 openid
+  window.location.href = WORKER_URL + '?code=' + code + '&redirect=' + encodeURIComponent(LOGIN_PAGE_CLEAN);
+} else if (openid) {
+  // Worker 换完 openid 跳回来了 → 存起来
+  localStorage.setItem('wx_openid', openid);
+  window.location.href = LOGIN_PAGE_CLEAN; // 刷新清参数
 } else {
-  // 没有 code → 检查本地是否有 openid
+  // 没有 code 也没有 openid → 检查本地
   const savedOpenid = localStorage.getItem('wx_openid');
   const allowList = getAllowList();
 
@@ -136,8 +127,8 @@ if (code) {
     document.getElementById('subText').style.display = 'none';
     setTimeout(() => { window.location.href = HOME_PAGE; }, 1000);
   } else {
-    // 显示微信扫码
-    const redirectUri = window.location.href.split('?')[0]; // 当前页面自身
+    // 显示二维码
+    const redirectUri = LOGIN_PAGE_CLEAN;
     const wxUrl = 'https://open.weixin.qq.com/connect/oauth2/authorize'
       + '?appid=' + WX_APPID
       + '&redirect_uri=' + encodeURIComponent(redirectUri)
@@ -146,17 +137,15 @@ if (code) {
       + '&state=auth'
       + '#wechat_redirect';
 
-    // 二维码
     const qrImg = document.createElement('img');
     qrImg.src = 'https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=' + encodeURIComponent(wxUrl);
     qrImg.style.width = '200px';
     qrImg.style.height = '200px';
     document.getElementById('qrcode').appendChild(qrImg);
 
-    // 调试：显示二维码内的链接
     const debug = document.createElement('p');
     debug.style.cssText = 'font-size:11px;color:#aaa;margin-top:8px;word-break:break-all;max-width:300px;';
-    debug.textContent = '调试链接: ' + wxUrl;
+    debug.textContent = '调试: ' + wxUrl;
     document.getElementById('qrcode').appendChild(debug);
 
     if (savedOpenid) {
